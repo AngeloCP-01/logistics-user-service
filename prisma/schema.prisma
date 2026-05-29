@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("USER_DB_URL")
+}
+
+enum VehicleType {
+  motorcycle
+  car
+  van
+  truck
+}
+
+model CustomerProfile {
+  userId            String   @id @db.Uuid
+  displayName       String   @map("display_name") @db.VarChar(80)
+  phone             String?  @db.VarChar(20)
+  defaultAddressId  String?  @map("default_address_id") @db.Uuid
+  createdAt         DateTime @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @map("updated_at") @db.Timestamptz(6)
+
+  defaultAddress Address?  @relation("DefaultAddress", fields: [defaultAddressId], references: [id], onDelete: SetNull)
+  addresses      Address[] @relation("OwnedAddresses")
+
+  @@map("customer_profiles")
+}
+
+model DriverProfile {
+  userId          String       @id @db.Uuid
+  vehicleType     VehicleType? @map("vehicle_type")
+  licensePlate    String?      @map("license_plate") @db.VarChar(20)
+  isAvailable     Boolean      @default(false) @map("is_available")
+  profileComplete Boolean      @default(false) @map("profile_complete")
+  createdAt       DateTime     @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @map("updated_at") @db.Timestamptz(6)
+
+  @@map("driver_profiles")
+}
+
+model Address {
+  id        String   @id @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  label     String   @db.VarChar(40)
+  street    String   @db.VarChar(200)
+  city      String   @db.VarChar(80)
+  country   String   @db.VarChar(2)
+  lat       Decimal  @db.Decimal(9, 6)
+  lng       Decimal  @db.Decimal(9, 6)
+  createdAt DateTime @map("created_at") @db.Timestamptz(6)
+
+  owner       CustomerProfile  @relation("OwnedAddresses", fields: [userId], references: [userId], onDelete: Cascade)
+  defaultedBy CustomerProfile[] @relation("DefaultAddress")
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model ProcessedEvent {
+  eventId     String   @id @db.Uuid @map("event_id")
+  eventType   String   @map("event_type") @db.VarChar(80)
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz(6)
+
+  @@map("processed_events")
+}
