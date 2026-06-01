@@ -73,6 +73,8 @@ export async function bootstrap(opts?: { startConsumer?: boolean }): Promise<Int
   await prisma.$connect();
 
   const { connection: amqpConn, channel: amqpCh } = await connect(env.RABBITMQ_URL);
+  let activeChannel: typeof amqpCh | null = amqpCh;
+  amqpCh.on("close", () => { activeChannel = null; });
   const publisher = new RabbitMqEventPublisher(amqpCh);
   const clock = new SystemClock();
   const uow = new PrismaUnitOfWork(prisma);
@@ -102,7 +104,7 @@ export async function bootstrap(opts?: { startConsumer?: boolean }): Promise<Int
   );
 
   let shuttingDown = false;
-  const health = new HealthController(prisma, () => amqpCh, () => shuttingDown);
+  const health = new HealthController(prisma, () => activeChannel, () => shuttingDown);
 
   const userJwt = new UserJwtVerifier(USER_SECRET);
   const serviceJwt = new ServiceJwtVerifier(SERVICE_SECRET, "user-service");
