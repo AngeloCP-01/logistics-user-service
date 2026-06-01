@@ -26,6 +26,14 @@ export function buildRoutes(deps: RouteDeps): Router {
   r.get("/healthz", deps.health.liveness);
   r.get("/readyz", deps.health.readiness);
 
+  // Internal — require service JWT. Mounted before /v1/users so the
+  // /internal subtree is not gated by user-auth on the more specific path.
+  const internal = Router();
+  internal.use(serviceAuth(deps.serviceJwt));
+  internal.get("/drivers/:userId", deps.internal.getDriver);
+  internal.get("/addresses/:addressId", deps.internal.getAddress);
+  r.use("/v1/users/internal", internal);
+
   // Public — require user JWT
   const pub = Router();
   pub.use(userAuth(deps.userJwt));
@@ -43,13 +51,6 @@ export function buildRoutes(deps: RouteDeps): Router {
   pub.put("/me/availability", requireRole(["driver"]), deps.drivers.putAvailability);
 
   r.use("/v1/users", pub);
-
-  // Internal — require service JWT
-  const internal = Router();
-  internal.use(serviceAuth(deps.serviceJwt));
-  internal.get("/drivers/:userId", deps.internal.getDriver);
-  internal.get("/addresses/:addressId", deps.internal.getAddress);
-  r.use("/v1/users/internal", internal);
 
   return r;
 }
