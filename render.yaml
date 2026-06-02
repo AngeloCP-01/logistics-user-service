@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: user-service
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /healthz
+    dockerCommand: node dist/server.js
+    envVars:
+      - { key: NODE_ENV, value: production }
+      - { key: PORT, value: 3000 }
+      - { key: LOG_LEVEL, value: info }
+      - { key: LOG_SERVICE_NAME, value: user-service }
+      - { key: USER_DB_URL, sync: false }            # set in Render UI
+      - { key: USER_JWT_SECRET, sync: false }
+      - { key: USER_SERVICE_JWT_SECRET, sync: false }
+      - { key: RABBITMQ_URL, sync: false }
