@@ -75,6 +75,10 @@ export async function bootstrap(opts?: { startConsumer?: boolean }): Promise<Int
   const { connection: amqpConn, channel: amqpCh } = await connect(env.RABBITMQ_URL);
   let activeChannel: typeof amqpCh | null = amqpCh;
   amqpCh.on("close", () => { activeChannel = null; });
+  // Silence heartbeat/connection errors that fire after the broker container is killed
+  // during tests (e.g., I17 stops RabbitMQ to verify /readyz flips to 503).
+  amqpCh.on("error", () => { /* tolerated in tests */ });
+  amqpConn.on("error", () => { /* tolerated in tests */ });
   const publisher = new RabbitMqEventPublisher(amqpCh);
   const clock = new SystemClock();
   const uow = new PrismaUnitOfWork(prisma);
