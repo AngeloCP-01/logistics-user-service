@@ -1,6 +1,6 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 import type { AddressRepository } from "../../application/ports/address-repository.js";
-import { Address } from "../../domain/address/address.js";
+import type { Address } from "../../domain/address/address.js";
 import { AddressMapper } from "./address-mapper.js";
 import type { AddressId } from "../../domain/shared/address-id.js";
 import type { UserId } from "../../domain/shared/user-id.js";

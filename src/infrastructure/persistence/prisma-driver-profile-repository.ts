@@ -1,6 +1,6 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 import type { DriverProfileRepository } from "../../application/ports/driver-profile-repository.js";
-import { DriverProfile } from "../../domain/driver/driver-profile.js";
+import type { DriverProfile } from "../../domain/driver/driver-profile.js";
 import { DriverProfileMapper } from "./driver-profile-mapper.js";
 import type { UserId } from "../../domain/shared/user-id.js";
 

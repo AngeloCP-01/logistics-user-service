@@ -20,6 +20,7 @@ describe("loadEnv", () => {
   });
 
   it("rejects missing USER_DB_URL", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { USER_DB_URL, ...incomplete } = validEnv;
     expect(() => loadEnv(incomplete)).toThrow(/USER_DB_URL/);
   });

@@ -1,6 +1,6 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 import type { CustomerProfileRepository } from "../../application/ports/customer-profile-repository.js";
-import { CustomerProfile } from "../../domain/customer/customer-profile.js";
+import type { CustomerProfile } from "../../domain/customer/customer-profile.js";
 import { CustomerProfileMapper } from "./customer-profile-mapper.js";
 import type { UserId } from "../../domain/shared/user-id.js";
 

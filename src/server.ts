@@ -37,7 +37,7 @@ import { createApp } from "./app.js";
 
 async function main(): Promise<void> {
   if (process.argv[2] === "--healthcheck") {
-    console.log(JSON.stringify({ ok: true, service: "user-service" }));
+    process.stdout.write(JSON.stringify({ ok: true, service: "user-service" }) + "\n");
     process.exit(0);
   }
 
@@ -124,6 +124,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error(JSON.stringify({ level: "error", event: "boot_failed", err: String(err) }));
+  process.stderr.write(JSON.stringify({ level: "error", event: "boot_failed", err: String(err) }) + "\n");
   process.exit(1);
 });
