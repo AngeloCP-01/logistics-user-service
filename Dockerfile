@@ -4,10 +4,9 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
-ARG NODE_AUTH_TOKEN
-RUN --mount=type=secret,id=npmrc \
+RUN --mount=type=secret,id=NODE_AUTH_TOKEN \
     --mount=type=cache,target=/root/.npm \
-    NODE_AUTH_TOKEN="${NODE_AUTH_TOKEN}" npm ci
+    NODE_AUTH_TOKEN="$(cat /run/secrets/NODE_AUTH_TOKEN)" npm ci
 
 # ---- prisma generate ----
 FROM node:20-alpine AS prisma
