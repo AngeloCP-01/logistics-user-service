@@ -3,7 +3,7 @@
 > Customer and driver profiles, addresses, preferences.
 
 **Phase:** 2 (Gateway + User)
-**Status:** 🟡 Plan written; implementation pending (spec + plan landed 2026-05-29)
+**Status:** ✅ v0.1.0 shipped + CI green + GHCR image published
 
 ## What this service does
 
