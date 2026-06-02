@@ -197,36 +197,22 @@ npm run test:all       # both
 
 ## Exercise the service
 
-User-service profile rows are spawned **only by consumed AMQP events** — there is no `POST /v1/users` endpoint. The fastest local flow:
+User-service profile rows are spawned **only by consumed AMQP events** — there is no `POST /v1/users` endpoint. Use the REST Client file at [`docs/user-service.http`](docs/user-service.http) to fire every endpoint. Open in VS Code with the `humao.rest-client` extension, then click "Send Request" above any block. Named requests (`# @name createHome`, `# @name createWork`) auto-capture address ids so subsequent requests use them via `{{createHome.response.body.id}}` — no copy-paste.
 
-```bash
-# 1. Publish a fake user.registered envelope via the RabbitMQ management UI (http://localhost:15672, guest/guest)
-#    Exchange: logistics.events
-#    Routing key: user.registered
-#    Body:
-#    {
-#      "eventId": "<uuid v7>",
-#      "eventType": "user.registered",
-#      "eventVersion": "1.0.0",
-#      "occurredAt": "2026-06-02T00:00:00Z",
-#      "correlationId": "smoke-1",
-#      "producer": "auth-service",
-#      "data": { "userId": "<same uuid v7>", "email": "alice@example.com", "role": "customer" }
-#    }
+The file walks through the manual seed flow:
 
-# 2. Sign a user JWT for that userId with USER_JWT_SECRET
-node -e 'const jwt=require("jsonwebtoken"); console.log(jwt.sign({sub:"<userId>", role:"customer"}, process.env.USER_JWT_SECRET, {algorithm:"HS256", expiresIn:"15m"}))'
+1. **Seed a profile** — either run auth-service alongside (`npm run dev` in `../logistics-auth-service`) and call `POST /auth/register`, or publish a fake `user.registered` envelope manually via the RabbitMQ management UI (`http://localhost:15672`, guest/guest). The bottom of the .http file has the exact envelope shape.
+2. **Mint a JWT** for the seeded userId using the node one-liner at the top of the .http file (signed with `USER_JWT_SECRET`, which must equal auth-service's `AUTH_JWT_SECRET`).
+3. **Paste tokens** into the `@customerToken` / `@driverToken` / `@adminToken` / `@serviceToken` variables at the top of the file.
+4. **Exercise** the customer flow, address CRUD, driver onboarding + availability, admin synthesized `/me`, internal endpoints, and the negative-path probes.
 
-# 3. Hit GET /me
-curl -i -H "Authorization: Bearer $TOKEN" http://localhost:3001/v1/users/me
-
-# 4. POST an address
-curl -i -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"label":"Home","street":"1 Main","city":"Manila","country":"PH","lat":14.5995,"lng":120.9842}' \
-  http://localhost:3001/v1/users/me/addresses
-```
-
-In a real deployment, step 2 is done by `auth-service` after `POST /auth/login`. The events in step 1 are emitted by `auth-service` after `POST /auth/register`.
+The file includes:
+- The full customer flow (`GET /me` → `POST /addresses` (×2) → `PUT /default-address` → `PATCH /me/addresses/{id}` → `DELETE /addresses/{id}` with the 409-default trap)
+- Driver onboarding (`PATCH /me/driver` → `PUT /me/availability` true → false) with the AMQP republish
+- Admin synthesized `GET /me` (no DB lookup)
+- Service-JWT internal endpoints (driver lookup, address lookup)
+- Manual RabbitMQ seed envelopes for `user.registered` (customer + driver) and `user.role_changed` (promote + demote + cleanup republish)
+- Negative-path probes (no auth, bogus JWT, wrong role, incomplete driver, unowned address, out-of-range coords, user JWT on internal endpoint, wrong-audience service JWT) for spot-checking the RFC 7807 error shapes
 
 ## Build + Docker
 

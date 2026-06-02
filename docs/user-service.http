@@ -1,0 +1,403 @@
+### user-service local exercise file
+# REST Client (VS Code) — runs every endpoint of the service.
+# Boot the server first: `npm run dev` (loads .env via tsx --env-file).
+#
+# Profiles are EVENT-DRIVEN. There is no POST /v1/users — profile rows
+# are spawned by `user.registered` events from auth-service. Before using
+# this file, seed at least one profile via one of:
+#
+#   A. Run auth-service alongside (`npm run dev` in ../logistics-auth-service)
+#      and call POST /auth/register. auth-service publishes user.registered
+#      to RabbitMQ; user-service's consumer creates the profile row, and
+#      auth-service's login response gives you a JWT signed with
+#      AUTH_JWT_SECRET (which MUST equal USER_JWT_SECRET).
+#
+#   B. Publish a fake user.registered envelope via the RabbitMQ management
+#      UI (http://localhost:15672, guest/guest) — see the "Manual seed"
+#      block at the bottom of this file for the exact envelope shape, then
+#      self-mint a JWT for that userId via the node one-liner below.
+#
+# Usage:
+#   1. Seed the profile (A or B above).
+#   2. Get a valid user JWT for the seeded userId. Either grab one from
+#      auth-service's login response, or self-mint with the matching
+#      USER_JWT_SECRET:
+#        node -e 'const jwt=require("jsonwebtoken"); console.log(jwt.sign({sub:"<userId>", role:"customer"}, process.env.USER_JWT_SECRET, {algorithm:"HS256", expiresIn:"15m"}))'
+#   3. Paste the JWT into @customerToken / @driverToken / @adminToken below.
+#   4. Click "Send Request" above any block. Captured responses (`# @name`)
+#      auto-feed later requests — no copy-paste of ids.
+#
+# Order matters for the demo flow:
+#   GET /me → POST /addresses → PUT /default-address → PATCH /me →
+#   (driver) PATCH /me/driver → PUT /me/availability.
+#
+# Internal endpoints (/v1/users/internal/*) require a SERVICE JWT signed
+# with USER_SERVICE_JWT_SECRET (a separate, distinct secret from
+# USER_JWT_SECRET — boot will refuse to start if they're equal). Self-mint:
+#   node -e 'const jwt=require("jsonwebtoken"); console.log(jwt.sign({sub:"svc:dispatch-service", aud:"user-service"}, process.env.USER_SERVICE_JWT_SECRET, {algorithm:"HS256", expiresIn:"5m"}))'
+
+@host = http://localhost:3001
+@contentType = application/json
+
+# Synthetic test identities — change between runs if you don't reset the DB.
+# Each userId MUST be a real UUID v7 that you used when publishing the
+# user.registered envelope (or registering via auth-service).
+@customerUserId = 01940000-0000-7000-8000-000000000001
+@driverUserId   = 01940000-0000-7000-8000-000000000002
+@adminUserId    = 01940000-0000-7000-8000-000000000003
+@otherUserId    = 01940000-0000-7000-8000-000000000099
+
+# Paste valid user JWTs here (see header — node one-liner self-mints them).
+@customerToken = <paste customer JWT here>
+@driverToken   = <paste driver JWT here>
+@adminToken    = <paste admin JWT here>
+
+# Paste a valid service JWT here for internal endpoints (see header).
+@serviceToken  = <paste service JWT here>
+
+
+############################################################
+# Health
+############################################################
+
+### healthz — liveness (always 200)
+GET {{host}}/healthz
+
+### readyz — readiness (200 when DB + Rabbit are healthy)
+GET {{host}}/readyz
+
+
+############################################################
+# Customer profile flow
+############################################################
+
+### Me — read the customer profile (seeded by user.registered)
+# @name getMe
+GET {{host}}/v1/users/me
+Authorization: Bearer {{customerToken}}
+
+
+### Update display name + phone
+PATCH {{host}}/v1/users/me
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "displayName": "Alice Customer",
+  "phone": "+639171234567"
+}
+
+
+### Clear phone (explicit null — partial update)
+PATCH {{host}}/v1/users/me
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "phone": null
+}
+
+
+############################################################
+# Address CRUD
+############################################################
+
+### List the caller's addresses (empty until POST)
+GET {{host}}/v1/users/me/addresses
+Authorization: Bearer {{customerToken}}
+
+
+### Create an address — Manila (Rizal Park). Captures the new id.
+# @name createHome
+POST {{host}}/v1/users/me/addresses
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "label": "Home",
+  "street": "Roxas Blvd",
+  "city": "Manila",
+  "country": "PH",
+  "lat": 14.5824,
+  "lng": 120.9772
+}
+
+
+### Create a second address — Makati (Ayala Triangle)
+# @name createWork
+POST {{host}}/v1/users/me/addresses
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "label": "Work",
+  "street": "Ayala Triangle",
+  "city": "Makati",
+  "country": "PH",
+  "lat": 14.5547,
+  "lng": 121.0244
+}
+
+
+### Set the home address as the default
+PUT {{host}}/v1/users/me/default-address
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "addressId": "{{createHome.response.body.id}}"
+}
+
+
+### Update the work address label only (partial)
+PATCH {{host}}/v1/users/me/addresses/{{createWork.response.body.id}}
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "label": "Office"
+}
+
+
+### Delete the default address — expect 409 default_address_in_use
+DELETE {{host}}/v1/users/me/addresses/{{createHome.response.body.id}}
+Authorization: Bearer {{customerToken}}
+
+
+### Delete the non-default address — expect 204
+DELETE {{host}}/v1/users/me/addresses/{{createWork.response.body.id}}
+Authorization: Bearer {{customerToken}}
+
+
+############################################################
+# Driver profile + availability
+############################################################
+#
+# Drivers also have a customer_profiles row (universal identity carrier).
+# Plus a driver_profiles extension row that must be completed
+# (vehicleType + licensePlate) before is_available can flip to true.
+# Toggling availability publishes driver.availability.changed.
+#
+############################################################
+
+### Me — as a driver (seeded via user.registered with role=driver)
+GET {{host}}/v1/users/me
+Authorization: Bearer {{driverToken}}
+
+
+### Set vehicle type + license plate (driver-only). Marks profile complete.
+PATCH {{host}}/v1/users/me/driver
+Authorization: Bearer {{driverToken}}
+Content-Type: {{contentType}}
+
+{
+  "vehicleType": "motorcycle",
+  "licensePlate": "ABC-1234"
+}
+
+
+### Go available — publishes driver.availability.changed (isAvailable=true)
+PUT {{host}}/v1/users/me/availability
+Authorization: Bearer {{driverToken}}
+Content-Type: {{contentType}}
+
+{
+  "available": true
+}
+
+
+### Go offline — publishes driver.availability.changed (isAvailable=false)
+PUT {{host}}/v1/users/me/availability
+Authorization: Bearer {{driverToken}}
+Content-Type: {{contentType}}
+
+{
+  "available": false
+}
+
+
+############################################################
+# Admin GET /me (synthesized — no DB row required)
+############################################################
+#
+# Admins do NOT have a customer_profiles row. auth-service's
+# user.registered event has role enum [customer, driver] only;
+# admins are seeded out-of-band. GET /me synthesizes the response
+# from JWT claims; no DB lookup happens.
+#
+############################################################
+
+### Admin reads /me — returns synthesized JWT-only response
+GET {{host}}/v1/users/me
+Authorization: Bearer {{adminToken}}
+
+
+############################################################
+# Internal endpoints (service JWT required)
+############################################################
+#
+# Called by dispatch-service and order-service through the gateway.
+# The gateway forwards both Authorization (user JWT, ignored on
+# /v1/users/internal/*) and X-Service-Authorization (service JWT,
+# REQUIRED — audience must equal "user-service").
+#
+############################################################
+
+### Dispatch reads a driver's full profile + display name
+GET {{host}}/v1/users/internal/drivers/{{driverUserId}}
+X-Service-Authorization: Bearer {{serviceToken}}
+
+
+### Order-service reads an address by id (any user's — service trust)
+GET {{host}}/v1/users/internal/addresses/{{createHome.response.body.id}}
+X-Service-Authorization: Bearer {{serviceToken}}
+
+
+############################################################
+# Manual seed (RabbitMQ management UI: http://localhost:15672, guest/guest)
+############################################################
+#
+# These envelopes simulate what auth-service publishes. Substitute your
+# own userId / eventId — both must be valid UUID v7 (the validator
+# accepts any 36-char UUID-shaped string, but UUID v7 is the convention).
+#
+# ────── user.registered (customer) ──────
+# Exchange:    logistics.events
+# Routing key: user.registered
+# Body:
+# {
+#   "eventId": "01940000-0000-7000-8000-aaaaaaaaaaaa",
+#   "eventType": "user.registered",
+#   "eventVersion": "1.0.0",
+#   "occurredAt": "2026-06-02T00:00:00Z",
+#   "correlationId": "smoke-1",
+#   "producer": "auth-service",
+#   "data": {
+#     "userId": "01940000-0000-7000-8000-000000000001",
+#     "email": "alice@example.com",
+#     "role": "customer"
+#   }
+# }
+#
+# ────── user.registered (driver — also creates incomplete driver_profiles) ──────
+# Body (same envelope shape, data.role=driver, change userId + eventId):
+# {
+#   ...
+#   "data": {
+#     "userId": "01940000-0000-7000-8000-000000000002",
+#     "email": "bob@example.com",
+#     "role": "driver"
+#   }
+# }
+#
+# ────── user.role_changed (customer → driver) ──────
+# Exchange:    logistics.events
+# Routing key: user.role_changed
+# Body:
+# {
+#   "eventId": "01940000-0000-7000-8000-bbbbbbbbbbbb",
+#   "eventType": "user.role_changed",
+#   "eventVersion": "1.0.0",
+#   "occurredAt": "2026-06-02T00:00:00Z",
+#   "correlationId": "smoke-2",
+#   "producer": "auth-service",
+#   "data": {
+#     "userId": "01940000-0000-7000-8000-000000000001",
+#     "oldRole": "customer",
+#     "newRole": "driver",
+#     "changedBy": "01940000-0000-7000-8000-ffffffffffff",
+#     "changedAt": "2026-06-02T00:00:00Z"
+#   }
+# }
+#
+# ────── user.role_changed (driver → customer; demoting an AVAILABLE driver) ──────
+# This is the cleanup path — user-service publishes a final
+# driver.availability.changed {isAvailable: false} BEFORE deleting the
+# driver_profiles row. Watch the RabbitMQ queue bound to
+# driver.availability.changed to observe the republish.
+# Body: same shape as above with oldRole=driver, newRole=customer.
+#
+
+
+############################################################
+# Negative-path probes (intentionally fail; for spot-checking error shapes)
+############################################################
+
+### No auth — expect 401 unauthorized
+GET {{host}}/v1/users/me
+
+
+### Bogus JWT — expect 401 unauthorized
+GET {{host}}/v1/users/me
+Authorization: Bearer not.a.real.jwt
+
+
+### Customer hitting driver endpoint — expect 403 role_required
+PATCH {{host}}/v1/users/me/driver
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "vehicleType": "car"
+}
+
+
+### Admin trying to PATCH /me — expect 403 role_required (admins have no profile row)
+PATCH {{host}}/v1/users/me
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "displayName": "Should fail"
+}
+
+
+### Driver going available before completing profile — expect 409 driver_profile_incomplete
+# Run on a freshly-seeded driver whose driver_profiles.profile_complete is still false.
+PUT {{host}}/v1/users/me/availability
+Authorization: Bearer {{driverToken}}
+Content-Type: {{contentType}}
+
+{
+  "available": true
+}
+
+
+### Set default to an address the caller doesn't own — expect 404 address_not_found
+PUT {{host}}/v1/users/me/default-address
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "addressId": "01940000-0000-7000-8000-fffffffffffe"
+}
+
+
+### Out-of-range lat — expect 400 validation_failed
+POST {{host}}/v1/users/me/addresses
+Authorization: Bearer {{customerToken}}
+Content-Type: {{contentType}}
+
+{
+  "label": "Invalid",
+  "street": "x",
+  "city": "y",
+  "country": "PH",
+  "lat": 999,
+  "lng": 0
+}
+
+
+### Internal endpoint with user JWT instead of service JWT — expect 401
+GET {{host}}/v1/users/internal/drivers/{{driverUserId}}
+Authorization: Bearer {{customerToken}}
+
+
+### Internal endpoint with no auth — expect 401
+GET {{host}}/v1/users/internal/drivers/{{driverUserId}}
+
+
+### Internal endpoint with wrong-audience service JWT — expect 401
+# Self-mint with aud="order-service" instead of "user-service" to exercise.
+GET {{host}}/v1/users/internal/drivers/{{driverUserId}}
+X-Service-Authorization: Bearer <paste wrong-aud service JWT here>
