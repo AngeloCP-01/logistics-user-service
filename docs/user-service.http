@@ -42,13 +42,13 @@
 # Synthetic test identities — change between runs if you don't reset the DB.
 # Each userId MUST be a real UUID v7 that you used when publishing the
 # user.registered envelope (or registering via auth-service).
-@customerUserId = 01940000-0000-7000-8000-000000000001
+@customerUserId = 47913fd3-7bf9-4182-9d94-6144ddb74cfe
 @driverUserId   = 01940000-0000-7000-8000-000000000002
 @adminUserId    = 01940000-0000-7000-8000-000000000003
 @otherUserId    = 01940000-0000-7000-8000-000000000099
 
 # Paste valid user JWTs here (see header — node one-liner self-mints them).
-@customerToken = <paste customer JWT here>
+@customerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NzkxM2ZkMy03YmY5LTQxODItOWQ5NC02MTQ0ZGRiNzRjZmUiLCJyb2xlIjoiY3VzdG9tZXIiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsImlhdCI6MTc4MDYyMzM2MCwiZXhwIjoxNzgwNjI0MjYwLCJhdWQiOiJsb2dpc3RpY3MtcGxhdGZvcm0iLCJpc3MiOiJhdXRoLXNlcnZpY2UifQ.CxmrGa2FZC4LQLfyE3Uzaw3aNMcwA-m6rahDEpepQI4
 @driverToken   = <paste driver JWT here>
 @adminToken    = <paste admin JWT here>
 
