@@ -201,7 +201,7 @@ User-service profile rows are spawned **only by consumed AMQP events** — there
 
 The file walks through the manual seed flow:
 
-1. **Seed a profile** — either run auth-service alongside (`npm run dev` in `../logistics-auth-service`) and call `POST /auth/register`, or publish a fake `user.registered` envelope manually via the RabbitMQ management UI (`http://localhost:15672`, guest/guest). The bottom of the .http file has the exact envelope shape.
+1. **Seed a profile** — either run auth-service alongside (`npm run dev` in `../logistics-auth-service`) and call `POST /v1/auth/register`, or publish a fake `user.registered` envelope manually via the RabbitMQ management UI (`http://localhost:15672`, guest/guest). The bottom of the .http file has the exact envelope shape.
 2. **Mint a JWT** for the seeded userId using the node one-liner at the top of the .http file (signed with `USER_JWT_SECRET`, which must equal auth-service's `AUTH_JWT_SECRET`).
 3. **Paste tokens** into the `@customerToken` / `@driverToken` / `@adminToken` / `@serviceToken` variables at the top of the file.
 4. **Exercise** the customer flow, address CRUD, driver onboarding + availability, admin synthesized `/me`, internal endpoints, and the negative-path probes.

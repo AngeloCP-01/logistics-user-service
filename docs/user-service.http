@@ -7,7 +7,7 @@
 # this file, seed at least one profile via one of:
 #
 #   A. Run auth-service alongside (`npm run dev` in ../logistics-auth-service)
-#      and call POST /auth/register. auth-service publishes user.registered
+#      and call POST /v1/auth/register. auth-service publishes user.registered
 #      to RabbitMQ; user-service's consumer creates the profile row, and
 #      auth-service's login response gives you a JWT signed with
 #      AUTH_JWT_SECRET (which MUST equal USER_JWT_SECRET).
