@@ -41,7 +41,7 @@ See [`../docs/superpowers/specs/2026-05-29-user-service-design.md`](../docs/supe
 | 3 | No `preferences` column. Notification-service owns its own preferences table in Phase 6. |
 | 4 | Client-side geocoding only. User-service validates `{lat, lng}` shape + range; never calls a geocoder. |
 | 5 | Customer-base schema: `customer_profiles` exists for customers + drivers; `driver_profiles` is a thin extension row for drivers only. Admins have no profile row. |
-| 6 | API surface: public CRUD on `/users/me` + `/users/me/addresses` + driver sub-resources; internal endpoints under `/v1/users/internal/*` gated by service JWT. No `POST /users`, no `GET /users/{id}`. |
+| 6 | API surface: public CRUD on `/v1/users/me` + `/v1/users/me/addresses` + driver sub-resources; internal endpoints under `/v1/users/internal/*` gated by service JWT. No generic `POST /v1/users` collection, no `GET /v1/users/{id}`. |
 | 7 | Events consumed: `user.registered`, `user.role_changed`. Event published: `driver.availability.changed` (minimal payload). |
 | 8 | Phone stored as plain string, 7–20 chars, nullable. No E.164 normalization. |
 
