@@ -14,7 +14,7 @@ Owns user profile data — everything about a user EXCEPT credentials. Profiles 
 - **Tech**: Node 20 LTS, TypeScript, Express, Prisma + Neon Postgres, Jest.
 - **Events consumed**: `user.registered` (provision a profile row).
 - **Events published**: `driver.availability.changed` (when a driver toggles availability).
-- **Sync HTTP exposed**: `/users/me` (caller's profile via gateway), plus internal-only endpoints for `dispatch-service` (driver profile by id) and `order-service` (address resolution) — these require a service JWT.
+- **Sync HTTP exposed**: `/v1/users/me` (caller's profile via gateway), plus internal-only endpoints for `dispatch-service` (driver profile by id) and `order-service` (address resolution) — these require a service JWT.
 - **Public endpoints** (via gateway): `/v1/users/me`, `/v1/users/me/addresses/*`, `/healthz`, `/readyz`.
 
 ## Database (Neon Postgres)
